@@ -1,0 +1,67 @@
+import Link from "next/link";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { createCategoryAction } from "../actions";
+
+export default async function NewCategoryPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ error?: string }>;
+}) {
+  const sp = (await searchParams) ?? {};
+  const error = sp.error;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Add Category</h1>
+          <p className="text-sm text-zinc-400">Create a new product category.</p>
+        </div>
+        <Link
+          href="/dashboard/categories"
+          className="rounded-lg border border-zinc-800 px-3 py-2 text-sm text-zinc-100 hover:bg-zinc-900/60"
+        >
+          Back
+        </Link>
+      </div>
+
+      {error ? (
+        <div className="rounded-lg border border-red-900/50 bg-red-950/40 px-3 py-2 text-sm text-red-300">
+          Invalid input. Please check and try again.
+        </div>
+      ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Category Details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form action={createCategoryAction} className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Name</label>
+              <input
+                name="name"
+                required
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-zinc-200"
+                placeholder="e.g. Antibiotics"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Description</label>
+              <input
+                name="description"
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-zinc-200"
+                placeholder="Optional"
+              />
+            </div>
+            <button className="rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-white">
+              Create category
+            </button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+
