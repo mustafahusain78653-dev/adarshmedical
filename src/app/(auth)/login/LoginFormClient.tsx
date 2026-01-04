@@ -28,7 +28,7 @@ export function LoginFormClient() {
       const body = (await res.json().catch(() => null)) as {
         error?: { message?: string };
       } | null;
-      setError(body?.error?.message || "Login failed. Please try again.");
+      setError(body?.error?.message || "Login failed. Pleasee try again.");
       return;
     }
 
