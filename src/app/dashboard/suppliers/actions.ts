@@ -19,10 +19,10 @@ export async function createSupplierAction(formData: FormData) {
     address: formData.get("address"),
     gstin: formData.get("gstin"),
   });
-  if (!parsed.success) redirect("/dashboard/suppliers?error=invalid");
+  if (!parsed.success) redirect("/dashboard/suppliers");
   await connectDb();
   await Supplier.create(parsed.data);
-  redirect("/dashboard/suppliers?toast=created");
+  redirect("/dashboard/suppliers");
 }
 
 export async function updateSupplierAction(formData: FormData) {
@@ -33,18 +33,18 @@ export async function updateSupplierAction(formData: FormData) {
     address: formData.get("address"),
     gstin: formData.get("gstin"),
   });
-  if (!id || !parsed.success) redirect("/dashboard/suppliers?error=invalid");
+  if (!id || !parsed.success) redirect("/dashboard/suppliers");
   await connectDb();
   await Supplier.findByIdAndUpdate(id, parsed.data, { runValidators: true });
-  redirect("/dashboard/suppliers?toast=updated");
+  redirect("/dashboard/suppliers");
 }
 
 export async function deleteSupplierAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
-  if (!id) redirect("/dashboard/suppliers?error=invalid");
+  if (!id) redirect("/dashboard/suppliers");
   await connectDb();
   await Supplier.findByIdAndDelete(id);
-  redirect("/dashboard/suppliers?toast=deleted");
+  redirect("/dashboard/suppliers");
 }
 
 

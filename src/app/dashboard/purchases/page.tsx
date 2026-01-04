@@ -3,8 +3,7 @@ import { connectDb } from "@/lib/db";
 import { Purchase } from "@/models/Purchase";
 import { Supplier } from "@/models/Supplier";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { deletePurchaseAction } from "./actions";
-import { ConfirmActionForm } from "@/components/ui/ConfirmActionForm";
+import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 
 export default async function PurchasesPage({
   searchParams,
@@ -107,15 +106,14 @@ export default async function PurchasesPage({
                     <td className="py-2 font-medium">₹ {Number(p.totalCost).toFixed(2)}</td>
                     <td className="py-2">
                       <div className="flex justify-end gap-2">
-                        <ConfirmActionForm
-                          action={deletePurchaseAction}
+                        <ConfirmDeleteButton
+                          url={`/api/purchases/${String(p._id)}`}
                           confirmMessage="Delete this purchase? This will revert the stock added by this purchase (only possible if stock won't go negative)."
                         >
-                          <input type="hidden" name="id" value={String(p._id)} />
                           <button className="rounded-lg border border-red-900/50 px-3 py-1.5 text-xs text-red-300 hover:bg-red-950/40">
                             Delete
                           </button>
-                        </ConfirmActionForm>
+                        </ConfirmDeleteButton>
                       </div>
                     </td>
                   </tr>

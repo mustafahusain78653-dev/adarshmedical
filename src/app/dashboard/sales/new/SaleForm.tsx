@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import { useTransition } from "react";
 
 type Batch = { batchNo: string; expiryDate: string; qty: number; unitPrice: number };
 type ProductOption = {
@@ -17,12 +19,12 @@ type Line = { productId: string; qty: number; unitPrice: number };
 export function SaleForm({
   products,
   customers,
-  action,
 }: {
   products: ProductOption[];
   customers: CustomerOption[];
-  action: (formData: FormData) => void;
 }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [lines, setLines] = useState<Line[]>([
     { productId: "", qty: 1, unitPrice: 0 },
   ]);
@@ -46,9 +48,9 @@ export function SaleForm({
 
   return (
     <form
-      action={action}
       className="space-y-4"
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
+        if (isPending) return;
         const invalid = lines.some(
           (it) =>
             !it.productId ||
@@ -60,7 +62,48 @@ export function SaleForm({
         if (invalid) {
           e.preventDefault();
           toast.error("Please fill all sale item fields (product, qty, unit price).");
+          return;
         }
+
+        e.preventDefault();
+
+        const fd = new FormData(e.currentTarget);
+        const customerId = String(fd.get("customerId") ?? "");
+        const customerName = String(fd.get("customerName") ?? "");
+        const paymentMethod = String(fd.get("paymentMethod") ?? "cash");
+        const soldAt = String(fd.get("soldAt") ?? "");
+        const notes = String(fd.get("notes") ?? "");
+
+        const res = await fetch("/api/sales", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            customerId,
+            customerName,
+            paymentMethod,
+            soldAt,
+            notes,
+            items: lines.map((l) => ({
+              productId: l.productId,
+              qty: Number(l.qty),
+              unitPrice: Number(l.unitPrice),
+            })),
+          }),
+        });
+
+        if (!res.ok) {
+          const body = (await res.json().catch(() => null)) as
+            | { error?: { message?: string } }
+            | null;
+          toast.error(body?.error?.message || "Failed to save sale.");
+          return;
+        }
+
+        toast.success("Sale saved.");
+        startTransition(() => {
+          router.replace("/dashboard/sales");
+          router.refresh();
+        });
       }}
     >
       <div className="grid gap-4 md:grid-cols-4">
@@ -214,10 +257,11 @@ export function SaleForm({
         />
       </div>
 
-      <input type="hidden" name="itemsJson" value={JSON.stringify(lines)} />
-
-      <button className="rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-white">
-        Save Sale
+      <button
+        disabled={isPending}
+        className="rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {isPending ? "Saving..." : "Save Sale"}
       </button>
     </form>
   );

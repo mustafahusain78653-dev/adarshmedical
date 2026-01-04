@@ -2,8 +2,7 @@ import Link from "next/link";
 import { connectDb } from "@/lib/db";
 import { Supplier } from "@/models/Supplier";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { deleteSupplierAction } from "./actions";
-import { ConfirmActionForm } from "@/components/ui/ConfirmActionForm";
+import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 
 export const dynamic = "force-dynamic";
 
@@ -111,15 +110,14 @@ export default async function SuppliersPage({
                         >
                           Edit
                         </Link>
-                        <ConfirmActionForm
-                          action={deleteSupplierAction}
+                        <ConfirmDeleteButton
+                          url={`/api/suppliers/${String(s._id)}`}
                           confirmMessage="Delete this supplier? This cannot be undone."
                         >
-                          <input type="hidden" name="id" value={String(s._id)} />
                           <button className="rounded-lg border border-red-900/50 px-3 py-1.5 text-xs text-red-300 hover:bg-red-950/40">
                             Delete
                           </button>
-                        </ConfirmActionForm>
+                        </ConfirmDeleteButton>
                       </div>
                     </td>
                   </tr>

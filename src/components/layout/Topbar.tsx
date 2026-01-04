@@ -1,14 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Menu } from "lucide-react";
-import { logoutAction } from "@/app/actions/auth";
+import { useRouter } from "next/navigation";
 import { MobileSidebar } from "@/components/layout/MobileSidebar";
 
 export function Topbar({ email }: { email: string }) {
   const name = (email.split("@")[0] || email).trim();
   const displayName = name ? name.charAt(0).toUpperCase() + name.slice(1) : email;
   const [open, setOpen] = useState(false);
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  async function onLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    startTransition(() => {
+      router.replace("/login");
+      router.refresh();
+    });
+  }
 
   return (
     <>
@@ -23,11 +33,14 @@ export function Topbar({ email }: { email: string }) {
           </button>
           <div className="text-sm text-zinc-300">Welcome {displayName}</div>
         </div>
-        <form action={logoutAction}>
-          <button className="rounded-lg border border-zinc-800 px-3 py-2 text-sm text-zinc-100 hover:bg-zinc-900/60">
-            Logout
-          </button>
-        </form>
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={onLogout}
+          className="rounded-lg border border-zinc-800 px-3 py-2 text-sm text-zinc-100 hover:bg-zinc-900/60 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isPending ? "Logging out..." : "Logout"}
+        </button>
       </header>
       <MobileSidebar open={open} onClose={() => setOpen(false)} />
     </>

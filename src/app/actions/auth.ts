@@ -7,9 +7,7 @@ import { env } from "@/lib/env";
 import { setSessionCookie, clearSessionCookie } from "@/lib/auth";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { AdminUser } from "@/models/AdminUser";
-
-const emailSchema = z.string().email().toLowerCase();
-const passwordSchema = z.string().min(6);
+import { emailSchema, passwordSchema } from "@/lib/validators/auth";
 
 export async function setupAction(formData: FormData) {
   const parsed = z
@@ -25,17 +23,17 @@ export async function setupAction(formData: FormData) {
     });
 
   if (!parsed.success) {
-    redirect("/setup?error=invalid");
+    redirect("/setup");
   }
 
   if (parsed.data.setupKey !== env.SETUP_KEY()) {
-    redirect("/setup?error=setup_key");
+    redirect("/setup");
   }
 
   await connectDb();
   const existing = await AdminUser.countDocuments();
   if (existing > 0) {
-    redirect("/login?error=already_setup");
+    redirect("/login");
   }
 
   const passwordHash = await hashPassword(parsed.data.password);
@@ -43,10 +41,11 @@ export async function setupAction(formData: FormData) {
     email: parsed.data.email,
     passwordHash,
     name: "Admin",
+    role: ["admin"],
   });
 
   await setSessionCookie({ sub: String(user._id), email: user.email });
-  redirect("/dashboard?toast=setup");
+  redirect("/dashboard");
 }
 
 export async function loginAction(formData: FormData) {
@@ -58,7 +57,7 @@ export async function loginAction(formData: FormData) {
     });
 
   if (!parsed.success) {
-    redirect("/login?error=invalid");
+    redirect("/login");
   }
 
   await connectDb();
@@ -67,18 +66,18 @@ export async function loginAction(formData: FormData) {
     email: string;
     passwordHash: string;
   }>();
-  if (!user) redirect("/login?error=invalid");
+  if (!user) redirect("/login");
 
   const ok = await verifyPassword(parsed.data.password, user.passwordHash);
-  if (!ok) redirect("/login?error=invalid");
+  if (!ok) redirect("/login");
 
   await setSessionCookie({ sub: String(user._id), email: user.email });
-  redirect("/dashboard?toast=login");
+  redirect("/dashboard");
 }
 
 export async function logoutAction() {
   await clearSessionCookie();
-  redirect("/login?toast=logout");
+  redirect("/login");
 }
 
 

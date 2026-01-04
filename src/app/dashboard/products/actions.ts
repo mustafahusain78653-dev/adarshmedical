@@ -37,7 +37,7 @@ export async function createProductAction(formData: FormData) {
     minStock: formData.get("minStock"),
     isActive: formData.get("isActive") === "on",
   });
-  if (!parsed.success) redirect("/dashboard/products/new?error=invalid");
+  if (!parsed.success) redirect("/dashboard/products/new");
 
   await connectDb();
   await Product.create({
@@ -46,7 +46,7 @@ export async function createProductAction(formData: FormData) {
     defaultSupplierId: parsed.data.defaultSupplierId || null,
   });
   revalidatePath("/dashboard/products");
-  redirect("/dashboard/products?toast=created");
+  redirect("/dashboard/products");
 }
 
 export async function updateProductAction(formData: FormData) {
@@ -63,7 +63,7 @@ export async function updateProductAction(formData: FormData) {
     minStock: formData.get("minStock"),
     isActive: formData.get("isActive") === "on",
   });
-  if (!id || !parsed.success) redirect("/dashboard/products?error=invalid");
+  if (!id || !parsed.success) redirect("/dashboard/products");
 
   await connectDb();
   await Product.findByIdAndUpdate(
@@ -77,16 +77,16 @@ export async function updateProductAction(formData: FormData) {
   );
   revalidatePath("/dashboard/products");
   revalidatePath(`/dashboard/products/${id}`);
-  redirect(`/dashboard/products/${id}?toast=updated&ts=${Date.now()}`);
+  redirect(`/dashboard/products/${id}`);
 }
 
 export async function deleteProductAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
-  if (!id) redirect("/dashboard/products?error=invalid");
+  if (!id) redirect("/dashboard/products");
   await connectDb();
   await Product.findByIdAndDelete(id);
   revalidatePath("/dashboard/products");
-  redirect("/dashboard/products?toast=deleted");
+  redirect("/dashboard/products");
 }
 
 export async function adjustBatchAction(formData: FormData) {
@@ -98,12 +98,12 @@ export async function adjustBatchAction(formData: FormData) {
   const unitPrice = asNumber(formData.get("unitPrice"));
 
   if (!productId || !batchNo || !expiryDateStr || !Number.isFinite(qtyChange)) {
-    redirect(`/dashboard/products/${productId}?error=invalid`);
+    redirect(`/dashboard/products/${productId}`);
   }
 
   const expiryDate = new Date(expiryDateStr);
   if (Number.isNaN(expiryDate.getTime())) {
-    redirect(`/dashboard/products/${productId}?error=invalid`);
+    redirect(`/dashboard/products/${productId}`);
   }
 
   await connectDb();
@@ -119,7 +119,7 @@ export async function adjustBatchAction(formData: FormData) {
 
   if (idx >= 0) {
     const nextQty = Number(product.batches[idx].qty) + qtyChange;
-    if (nextQty < 0) redirect(`/dashboard/products/${productId}?error=stock`);
+    if (nextQty < 0) redirect(`/dashboard/products/${productId}`);
     product.batches[idx].qty = nextQty;
     if (qtyChange > 0) {
       // allow updating latest cost/price
@@ -127,7 +127,7 @@ export async function adjustBatchAction(formData: FormData) {
       if (unitPrice >= 0) product.batches[idx].unitPrice = unitPrice;
     }
   } else {
-    if (qtyChange <= 0) redirect(`/dashboard/products/${productId}?error=batch`);
+    if (qtyChange <= 0) redirect(`/dashboard/products/${productId}`);
     product.batches.push({
       batchNo,
       expiryDate,
@@ -140,7 +140,7 @@ export async function adjustBatchAction(formData: FormData) {
   await product.save();
   revalidatePath("/dashboard/products");
   revalidatePath(`/dashboard/products/${productId}`);
-  redirect(`/dashboard/products/${productId}?toast=updated&ts=${Date.now()}`);
+  redirect(`/dashboard/products/${productId}`);
 }
 
 

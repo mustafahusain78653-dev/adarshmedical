@@ -24,16 +24,16 @@ export async function createSaleAction(formData: FormData) {
   try {
     rawItems = JSON.parse(itemsJson);
   } catch {
-    redirect("/dashboard/sales/new?error=items");
+    redirect("/dashboard/sales/new");
   }
 
   const reqParsed = z.array(requestItemSchema).safeParse(rawItems);
   if (!reqParsed.success || reqParsed.data.length === 0) {
-    redirect("/dashboard/sales/new?error=items");
+    redirect("/dashboard/sales/new");
   }
 
   const soldAt = soldAtStr ? new Date(soldAtStr) : new Date();
-  if (Number.isNaN(soldAt.getTime())) redirect("/dashboard/sales/new?error=date");
+  if (Number.isNaN(soldAt.getTime())) redirect("/dashboard/sales/new");
 
   await connectDb();
 
@@ -63,7 +63,7 @@ export async function createSaleAction(formData: FormData) {
 
   for (const req of reqParsed.data) {
     const product = await Product.findById(req.productId);
-    if (!product) redirect("/dashboard/sales/new?error=product");
+    if (!product) redirect("/dashboard/sales/new");
 
     const productBatches = product.batches as unknown as ProductBatch[];
     const batches = [...productBatches]
@@ -97,7 +97,7 @@ export async function createSaleAction(formData: FormData) {
       consumeFromBatch(b, take);
       remaining -= take;
     }
-    if (remaining > 0) redirect("/dashboard/sales/new?error=stock");
+    if (remaining > 0) redirect("/dashboard/sales/new");
 
     await product.save();
   }
@@ -115,12 +115,12 @@ export async function createSaleAction(formData: FormData) {
     profit,
   });
 
-  redirect("/dashboard/sales?toast=created");
+  redirect("/dashboard/sales");
 }
 
 export async function deleteSaleAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
-  if (!id) redirect("/dashboard/sales?error=invalid");
+  if (!id) redirect("/dashboard/sales");
 
   await connectDb();
   const sale = await Sale.findById(id).lean<{
@@ -139,7 +139,7 @@ export async function deleteSaleAction(formData: FormData) {
   // Revert stock changes
   for (const it of sale.items) {
     const product = await Product.findById(it.productId);
-    if (!product) redirect("/dashboard/sales?error=product");
+    if (!product) redirect("/dashboard/sales");
 
     type ProductBatch = { batchNo: string; expiryDate: Date; qty: number; unitCost: number; unitPrice: number };
     const productBatches = product.batches as unknown as ProductBatch[];
@@ -165,7 +165,7 @@ export async function deleteSaleAction(formData: FormData) {
   }
 
   await Sale.findByIdAndDelete(id);
-  redirect("/dashboard/sales?toast=deleted");
+  redirect("/dashboard/sales");
 }
 
 

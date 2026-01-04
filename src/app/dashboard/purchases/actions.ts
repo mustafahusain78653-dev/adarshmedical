@@ -26,16 +26,16 @@ export async function createPurchaseAction(formData: FormData) {
   try {
     rawItems = JSON.parse(itemsJson);
   } catch {
-    redirect("/dashboard/purchases/new?error=items");
+    redirect("/dashboard/purchases/new");
   }
 
   const itemsParsed = z.array(itemSchema).safeParse(rawItems);
   if (!itemsParsed.success || itemsParsed.data.length === 0) {
-    redirect("/dashboard/purchases/new?error=items");
+    redirect("/dashboard/purchases/new");
   }
 
   const purchasedAt = purchasedAtStr ? new Date(purchasedAtStr) : new Date();
-  if (Number.isNaN(purchasedAt.getTime())) redirect("/dashboard/purchases/new?error=date");
+  if (Number.isNaN(purchasedAt.getTime())) redirect("/dashboard/purchases/new");
 
   const items = itemsParsed.data.map((x) => ({
     ...x,
@@ -47,7 +47,7 @@ export async function createPurchaseAction(formData: FormData) {
   // Update stock batches
   for (const it of items) {
     const product = await Product.findById(it.productId);
-    if (!product) redirect("/dashboard/purchases/new?error=product");
+    if (!product) redirect("/dashboard/purchases/new");
 
     const expiryIso = it.expiryDate.toISOString().slice(0, 10);
     const batches = product.batches as unknown as Array<{ batchNo: unknown; expiryDate: Date }>;
@@ -84,12 +84,12 @@ export async function createPurchaseAction(formData: FormData) {
     totalCost,
   });
 
-  redirect("/dashboard/purchases?toast=created");
+  redirect("/dashboard/purchases");
 }
 
 export async function deletePurchaseAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
-  if (!id) redirect("/dashboard/purchases?error=invalid");
+  if (!id) redirect("/dashboard/purchases");
 
   await connectDb();
   const purchase = await Purchase.findById(id).lean<{
@@ -101,7 +101,7 @@ export async function deletePurchaseAction(formData: FormData) {
   // Revert stock changes
   for (const it of purchase.items) {
     const product = await Product.findById(it.productId);
-    if (!product) redirect("/dashboard/purchases?error=product");
+    if (!product) redirect("/dashboard/purchases");
 
     const expiryIso = new Date(it.expiryDate).toISOString().slice(0, 10);
     const batches = product.batches as unknown as Array<{ batchNo: unknown; expiryDate: Date; qty: number }>;
@@ -110,16 +110,16 @@ export async function deletePurchaseAction(formData: FormData) {
         String(b.batchNo).toLowerCase() === String(it.batchNo).toLowerCase() &&
         new Date(b.expiryDate).toISOString().slice(0, 10) === expiryIso
     );
-    if (idx < 0) redirect("/dashboard/purchases?error=batch");
+    if (idx < 0) redirect("/dashboard/purchases");
 
     const nextQty = Number(product.batches[idx].qty) - Number(it.qty);
-    if (nextQty < 0) redirect("/dashboard/purchases?error=stock");
+    if (nextQty < 0) redirect("/dashboard/purchases");
     product.batches[idx].qty = nextQty;
     await product.save();
   }
 
   await Purchase.findByIdAndDelete(id);
-  redirect("/dashboard/purchases?toast=deleted");
+  redirect("/dashboard/purchases");
 }
 
 

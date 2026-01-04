@@ -17,10 +17,10 @@ export async function createCustomerAction(formData: FormData) {
     phone: formData.get("phone"),
     address: formData.get("address"),
   });
-  if (!parsed.success) redirect("/dashboard/customers?error=invalid");
+  if (!parsed.success) redirect("/dashboard/customers");
   await connectDb();
   await Customer.create(parsed.data);
-  redirect("/dashboard/customers?toast=created");
+  redirect("/dashboard/customers");
 }
 
 export async function updateCustomerAction(formData: FormData) {
@@ -30,18 +30,18 @@ export async function updateCustomerAction(formData: FormData) {
     phone: formData.get("phone"),
     address: formData.get("address"),
   });
-  if (!id || !parsed.success) redirect("/dashboard/customers?error=invalid");
+  if (!id || !parsed.success) redirect("/dashboard/customers");
   await connectDb();
   await Customer.findByIdAndUpdate(id, parsed.data, { runValidators: true });
-  redirect("/dashboard/customers?toast=updated");
+  redirect("/dashboard/customers");
 }
 
 export async function deleteCustomerAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
-  if (!id) redirect("/dashboard/customers?error=invalid");
+  if (!id) redirect("/dashboard/customers");
   await connectDb();
   await Customer.findByIdAndDelete(id);
-  redirect("/dashboard/customers?toast=deleted");
+  redirect("/dashboard/customers");
 }
 
 

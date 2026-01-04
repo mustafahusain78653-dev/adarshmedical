@@ -24,6 +24,12 @@ export function middleware(req: NextRequest) {
   // Protect dashboard and non-auth API routes with a simple cookie session.
   const session = req.cookies.get("am_session")?.value;
   if (!session) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { error: { message: "Unauthorized", code: "UNAUTHORIZED" } },
+        { status: 401 }
+      );
+    }
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);

@@ -3,15 +3,12 @@ import { connectDb } from "@/lib/db";
 import { Product } from "@/models/Product";
 import { Customer } from "@/models/Customer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { createSaleAction } from "../actions";
 import { SaleForm } from "./SaleForm";
 
 export default async function NewSalePage({
-  searchParams,
 }: {
-  searchParams?: Promise<{ error?: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const sp = (await searchParams) ?? {};
   await connectDb();
   const [products, customers] = await Promise.all([
     Product.find({ isActive: true })
@@ -26,8 +23,6 @@ export default async function NewSalePage({
       >(),
     Customer.find().sort({ name: 1 }).lean<Array<{ _id: unknown; name: string }>>(),
   ]);
-
-  const error = sp.error;
 
   return (
     <div className="space-y-6">
@@ -44,21 +39,12 @@ export default async function NewSalePage({
         </Link>
       </div>
 
-      {error ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error === "stock"
-            ? "Not enough stock for one or more items."
-            : "Please fill items correctly and try again."}
-        </div>
-      ) : null}
-
       <Card>
         <CardHeader>
           <CardTitle>Sale</CardTitle>
         </CardHeader>
         <CardContent>
           <SaleForm
-            action={createSaleAction}
             customers={customers.map((c) => ({ id: String(c._id), name: c.name }))}
             products={products.map((p) => ({
               id: String(p._id),

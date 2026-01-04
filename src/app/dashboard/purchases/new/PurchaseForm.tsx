@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import { useTransition } from "react";
 
 type Option = { id: string; name: string; purchasePriceDefault?: number; salePriceDefault?: number };
 type SupplierOption = { id: string; name: string };
@@ -20,12 +22,12 @@ type Item = {
 export function PurchaseForm({
   suppliers,
   products,
-  action,
 }: {
   suppliers: SupplierOption[];
   products: Option[];
-  action: (formData: FormData) => void;
 }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const [items, setItems] = useState<Item[]>([
     { rowId: nanoid(), productId: "", batchNo: "", expiryDate: "", qty: 1, unitCost: 0, unitPrice: 0 },
@@ -50,9 +52,9 @@ export function PurchaseForm({
 
   return (
     <form
-      action={action}
       className="space-y-4"
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
+        if (isPending) return;
         const invalid = items.some(
           (it) =>
             !it.productId ||
@@ -68,7 +70,49 @@ export function PurchaseForm({
         if (invalid) {
           e.preventDefault();
           toast.error("Please fill all item fields (product, batch, expiry, qty, cost, price).");
+          return;
         }
+
+        e.preventDefault();
+
+        const fd = new FormData(e.currentTarget);
+        const supplierId = String(fd.get("supplierId") ?? "");
+        const invoiceNo = String(fd.get("invoiceNo") ?? "");
+        const purchasedAt = String(fd.get("purchasedAt") ?? "");
+        const notes = String(fd.get("notes") ?? "");
+
+        const res = await fetch("/api/purchases", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            supplierId,
+            invoiceNo,
+            purchasedAt,
+            notes,
+            items: items.map((it) => ({
+              productId: it.productId,
+              batchNo: it.batchNo,
+              expiryDate: it.expiryDate,
+              qty: Number(it.qty),
+              unitCost: Number(it.unitCost),
+              unitPrice: Number(it.unitPrice),
+            })),
+          }),
+        });
+
+        if (!res.ok) {
+          const body = (await res.json().catch(() => null)) as
+            | { error?: { message?: string } }
+            | null;
+          toast.error(body?.error?.message || "Failed to save purchase.");
+          return;
+        }
+
+        toast.success("Purchase saved.");
+        startTransition(() => {
+          router.replace("/dashboard/purchases");
+          router.refresh();
+        });
       }}
     >
       <div className="grid gap-4 md:grid-cols-3">
@@ -233,10 +277,11 @@ export function PurchaseForm({
         />
       </div>
 
-      <input type="hidden" name="itemsJson" value={JSON.stringify(items)} />
-
-      <button className="rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-white">
-        Save Purchase
+      <button
+        disabled={isPending}
+        className="rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {isPending ? "Saving..." : "Save Purchase"}
       </button>
     </form>
   );

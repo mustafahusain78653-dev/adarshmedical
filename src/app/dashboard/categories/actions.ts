@@ -15,11 +15,11 @@ export async function createCategoryAction(formData: FormData) {
     name: formData.get("name"),
     description: formData.get("description"),
   });
-  if (!parsed.success) redirect("/dashboard/categories?error=invalid");
+  if (!parsed.success) redirect("/dashboard/categories");
 
   await connectDb();
   await Category.create(parsed.data);
-  redirect("/dashboard/categories?toast=created");
+  redirect("/dashboard/categories");
 }
 
 export async function updateCategoryAction(formData: FormData) {
@@ -28,19 +28,19 @@ export async function updateCategoryAction(formData: FormData) {
     name: formData.get("name"),
     description: formData.get("description"),
   });
-  if (!id || !parsed.success) redirect("/dashboard/categories?error=invalid");
+  if (!id || !parsed.success) redirect("/dashboard/categories");
 
   await connectDb();
   await Category.findByIdAndUpdate(id, parsed.data, { runValidators: true });
-  redirect("/dashboard/categories?toast=updated");
+  redirect("/dashboard/categories");
 }
 
 export async function deleteCategoryAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
-  if (!id) redirect("/dashboard/categories?error=invalid");
+  if (!id) redirect("/dashboard/categories");
   await connectDb();
   await Category.findByIdAndDelete(id);
-  redirect("/dashboard/categories?toast=deleted");
+  redirect("/dashboard/categories");
 }
 
 

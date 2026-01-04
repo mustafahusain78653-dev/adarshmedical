@@ -4,8 +4,7 @@ import { Product } from "@/models/Product";
 import { Category } from "@/models/Category";
 import { Supplier } from "@/models/Supplier";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { deleteProductAction } from "./actions";
-import { ConfirmActionForm } from "@/components/ui/ConfirmActionForm";
+import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 
 export const dynamic = "force-dynamic";
 
@@ -157,15 +156,14 @@ export default async function ProductsPage({
                         >
                           Manage
                         </Link>
-                        <ConfirmActionForm
-                          action={deleteProductAction}
+                        <ConfirmDeleteButton
+                          url={`/api/products/${String(p._id)}`}
                           confirmMessage="Delete this product? This cannot be undone."
                         >
-                          <input type="hidden" name="id" value={String(p._id)} />
                           <button className="rounded-lg border border-red-900/50 px-3 py-1.5 text-xs text-red-300 hover:bg-red-950/40">
                             Delete
                           </button>
-                        </ConfirmActionForm>
+                        </ConfirmDeleteButton>
                       </div>
                     </td>
                   </tr>
