@@ -39,7 +39,8 @@ export type PurchaseDoc = InferSchemaType<typeof PurchaseSchema> & {
 };
 
 export const Purchase =
-  mongoose.models.Purchase || mongoose.model("Purchase", PurchaseSchema);
+  (mongoose.models.Purchase as mongoose.Model<PurchaseDoc> | undefined) ||
+  mongoose.model<PurchaseDoc>("Purchase", PurchaseSchema);
 
 
 

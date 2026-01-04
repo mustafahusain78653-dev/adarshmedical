@@ -39,14 +39,14 @@ export type ProductDoc = InferSchemaType<typeof ProductSchema> & {
 
 // In Next.js dev with HMR, the model may already be compiled with an older schema.
 // Ensure newly added fields exist on the existing model schema too.
-const existingModel = mongoose.models.Product as mongoose.Model<unknown> | undefined;
+const existingModel = mongoose.models.Product as mongoose.Model<ProductDoc> | undefined;
 if (existingModel && !existingModel.schema.path("piecesPerStrip")) {
   existingModel.schema.add({
     piecesPerStrip: { type: Number, default: 1, min: 1 },
   });
 }
 
-export const Product = existingModel || mongoose.model("Product", ProductSchema);
+export const Product = existingModel || mongoose.model<ProductDoc>("Product", ProductSchema);
 
 
 

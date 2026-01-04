@@ -48,7 +48,7 @@ export type SaleDoc = InferSchemaType<typeof SaleSchema> & {
 
 // In Next.js dev with HMR, the model may already be compiled with an older schema.
 // Ensure newly added fields exist on the existing model schema too.
-const existingModel = mongoose.models.Sale as mongoose.Model<unknown> | undefined;
+const existingModel = mongoose.models.Sale as mongoose.Model<SaleDoc> | undefined;
 if (existingModel) {
   // Old schema versions used min: 1 for items.qty, which breaks fractional strip quantities (e.g. 0.1 strip).
   const qtyPath = (existingModel.schema.path("items") as any)?.schema?.path?.("qty") as
@@ -65,28 +65,33 @@ if (existingModel) {
     }
   }
 }
-if (existingModel && !existingModel.schema.path("items.unitPricePerPiece")) {
-  existingModel.schema.path("items").schema.add({
-    unitPricePerPiece: { type: Number, required: true, min: 0 },
-  });
-}
-if (existingModel && !existingModel.schema.path("items.unitCostPerPiece")) {
-  existingModel.schema.path("items").schema.add({
-    unitCostPerPiece: { type: Number, required: true, min: 0 },
-  });
-}
-if (existingModel && !existingModel.schema.path("items.piecesSold")) {
-  existingModel.schema.path("items").schema.add({
-    piecesSold: { type: Number, required: true, min: 0 },
-  });
-}
-if (existingModel && !existingModel.schema.path("items.qtyUnit")) {
-  existingModel.schema.path("items").schema.add({
-    qtyUnit: { type: String, default: "piece", trim: true },
-    qtyEntered: { type: Number, default: 0, min: 0 },
-  });
+if (existingModel) {
+  const itemsPath = existingModel.schema.path("items") as any;
+  const itemSchema = itemsPath?.schema;
+
+  if (itemSchema && !existingModel.schema.path("items.unitPricePerPiece")) {
+    itemSchema.add({
+      unitPricePerPiece: { type: Number, required: true, min: 0 },
+    });
+  }
+  if (itemSchema && !existingModel.schema.path("items.unitCostPerPiece")) {
+    itemSchema.add({
+      unitCostPerPiece: { type: Number, required: true, min: 0 },
+    });
+  }
+  if (itemSchema && !existingModel.schema.path("items.piecesSold")) {
+    itemSchema.add({
+      piecesSold: { type: Number, required: true, min: 0 },
+    });
+  }
+  if (itemSchema && !existingModel.schema.path("items.qtyUnit")) {
+    itemSchema.add({
+      qtyUnit: { type: String, default: "piece", trim: true },
+      qtyEntered: { type: Number, default: 0, min: 0 },
+    });
+  }
 }
 
-export const Sale = existingModel || mongoose.model("Sale", SaleSchema);
+export const Sale = existingModel || mongoose.model<SaleDoc>("Sale", SaleSchema);
 
 

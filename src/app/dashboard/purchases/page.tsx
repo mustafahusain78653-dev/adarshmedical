@@ -172,7 +172,7 @@ export default async function PurchasesPage({
               ) : (
                 <Link
                   className="rounded-lg border border-zinc-800 px-3 py-2 text-sm text-zinc-100 hover:bg-zinc-900/60"
-                  href={`/dashboard/purchases?q=${encodeURIComponent(q)}&page=${page - 1}`}
+                  href={`/dashboard/purchases?page=${page - 1}`}
                 >
                   Prev
                 </Link>
@@ -188,7 +188,7 @@ export default async function PurchasesPage({
               ) : (
                 <Link
                   className="rounded-lg border border-zinc-800 px-3 py-2 text-sm text-zinc-100 hover:bg-zinc-900/60"
-                  href={`/dashboard/purchases?q=${encodeURIComponent(q)}&page=${page + 1}`}
+                  href={`/dashboard/purchases?page=${page + 1}`}
                 >
                   Next
                 </Link>
