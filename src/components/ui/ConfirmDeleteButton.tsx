@@ -12,7 +12,11 @@ export function ConfirmDeleteButton({
 }: {
   url: string;
   confirmMessage: string;
-  children: React.ReactElement;
+  children: React.ReactElement<{
+    onClick?: React.MouseEventHandler;
+    disabled?: boolean;
+    type?: string;
+  }>;
   onSuccessRedirectTo?: string;
 }) {
   const router = useRouter();
@@ -42,9 +46,9 @@ export function ConfirmDeleteButton({
     });
   }
 
-  const existingOnClick = (children.props as { onClick?: (e: React.MouseEvent) => void }).onClick;
-  const existingDisabled = Boolean((children.props as { disabled?: boolean }).disabled);
-  const typeProp = (children.props as { type?: string }).type;
+  const existingOnClick = children.props.onClick;
+  const existingDisabled = Boolean(children.props.disabled);
+  const typeProp = children.props.type;
 
   return React.cloneElement(children, {
     onClick: async (e: React.MouseEvent) => {
