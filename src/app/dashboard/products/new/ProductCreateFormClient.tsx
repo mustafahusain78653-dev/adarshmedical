@@ -17,15 +17,9 @@ export function ProductCreateFormClient({
   const [error, setError] = useState<string | null>(null);
 
   const [name, setName] = useState("");
-  const [unit, setUnit] = useState("strip");
-  const [genericName, setGenericName] = useState("");
   const [brand, setBrand] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [defaultSupplierId, setDefaultSupplierId] = useState("");
-  const [purchasePriceDefault, setPurchasePriceDefault] = useState<number>(0);
-  const [salePriceDefault, setSalePriceDefault] = useState<number>(0);
-  const [minStock, setMinStock] = useState<number>(0);
-  const [isActive, setIsActive] = useState(true);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,15 +30,9 @@ export function ProductCreateFormClient({
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         name,
-        unit,
-        genericName,
         brand,
         categoryId,
         defaultSupplierId,
-        purchasePriceDefault,
-        salePriceDefault,
-        minStock,
-        isActive,
       }),
     });
 
@@ -82,31 +70,12 @@ export function ProductCreateFormClient({
           />
         </div>
         <div className="space-y-1">
-          <label className="text-sm font-medium">Unit</label>
-          <input
-            value={unit}
-            onChange={(e) => setUnit(e.target.value)}
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-zinc-200"
-            placeholder="strip / bottle / box"
-          />
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Generic Name</label>
-          <input
-            value={genericName}
-            onChange={(e) => setGenericName(e.target.value)}
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-200"
-          />
-        </div>
-        <div className="space-y-1">
           <label className="text-sm font-medium">Brand</label>
           <input
             value={brand}
             onChange={(e) => setBrand(e.target.value)}
             className="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-200"
+            placeholder="Optional"
           />
         </div>
       </div>
@@ -143,43 +112,6 @@ export function ProductCreateFormClient({
           </select>
         </div>
       </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Default Purchase Price</label>
-          <input
-            type="number"
-            step="0.01"
-            value={purchasePriceDefault}
-            onChange={(e) => setPurchasePriceDefault(Number(e.target.value))}
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-200"
-          />
-        </div>
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Default Sale Price</label>
-          <input
-            type="number"
-            step="0.01"
-            value={salePriceDefault}
-            onChange={(e) => setSalePriceDefault(Number(e.target.value))}
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-200"
-          />
-        </div>
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Min Stock</label>
-          <input
-            type="number"
-            value={minStock}
-            onChange={(e) => setMinStock(Number(e.target.value))}
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-200"
-          />
-        </div>
-      </div>
-
-      <label className="flex items-center gap-2 text-sm">
-        <input checked={isActive} onChange={(e) => setIsActive(e.target.checked)} type="checkbox" />
-        Active
-      </label>
 
       <button
         disabled={isPending}

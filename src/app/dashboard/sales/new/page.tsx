@@ -17,7 +17,7 @@ export default async function NewSalePage({
         Array<{
           _id: unknown;
           name: string;
-          salePriceDefault?: number;
+          piecesPerStrip?: number;
           batches?: Array<{ batchNo: string; expiryDate: Date; qty: number; unitPrice?: number }>;
         }>
       >(),
@@ -29,7 +29,7 @@ export default async function NewSalePage({
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">New Sale</h1>
-          <p className="text-sm text-zinc-400">Record a sale and reduce stock.</p>
+          <p className="text-sm text-zinc-400">Record a sale.</p>
         </div>
         <Link
           href="/dashboard/sales"
@@ -49,12 +49,12 @@ export default async function NewSalePage({
             products={products.map((p) => ({
               id: String(p._id),
               name: p.name,
-              salePriceDefault: Number(p.salePriceDefault || 0),
+              piecesPerStrip: Number(p.piecesPerStrip || 10),
               batches: (p.batches ?? []).map((b) => ({
                 batchNo: String(b.batchNo),
                 expiryDate: new Date(b.expiryDate).toISOString().slice(0, 10),
                 qty: Number(b.qty),
-                unitPrice: Number(b.unitPrice ?? p.salePriceDefault ?? 0),
+                unitPrice: Number(b.unitPrice ?? 0),
               })),
             }))}
           />

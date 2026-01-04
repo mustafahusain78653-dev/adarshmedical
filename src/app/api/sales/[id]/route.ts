@@ -15,8 +15,10 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
       batchNo: string;
       expiryDate: Date | null;
       qty: number;
+      qtyUnit?: string;
       unitCost: number;
       unitPrice: number;
+      unitPricePerPiece?: number;
     }>;
   }>();
   if (!sale) return jsonError(404, "Sale not found", "NOT_FOUND");
@@ -28,6 +30,11 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
 
     type ProductBatch = { batchNo: string; expiryDate: Date; qty: number; unitCost: number; unitPrice: number };
     const productBatches = product.batches as unknown as ProductBatch[];
+
+    const piecesPerStrip = Math.max(1, Number((product as any).piecesPerStrip || 1));
+    const productUnit = String((product as any).unit || "strip");
+    const isStripProduct = productUnit === "strip" && piecesPerStrip > 1;
+
     const expiryIso = it.expiryDate ? new Date(it.expiryDate).toISOString().slice(0, 10) : null;
     const idx = productBatches.findIndex(
       (b) =>
@@ -38,12 +45,19 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
     if (idx >= 0) {
       product.batches[idx].qty = Number(product.batches[idx].qty) + Number(it.qty);
     } else {
+      const derivedUnitPricePerPiece =
+        typeof it.unitPricePerPiece === "number"
+          ? it.unitPricePerPiece
+          : isStripProduct && String(it.qtyUnit || "piece") === "strip"
+            ? Number(it.unitPrice || 0) / piecesPerStrip
+            : Number(it.unitPrice || 0);
+      const unitPriceStock = isStripProduct ? derivedUnitPricePerPiece * piecesPerStrip : derivedUnitPricePerPiece;
       product.batches.push({
         batchNo: String(it.batchNo || "UNKNOWN"),
         expiryDate: it.expiryDate ? new Date(it.expiryDate) : new Date(),
         qty: Number(it.qty),
         unitCost: Number(it.unitCost || 0),
-        unitPrice: Number(it.unitPrice || 0),
+        unitPrice: Number(unitPriceStock || 0),
       });
     }
 

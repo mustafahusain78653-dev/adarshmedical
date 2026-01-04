@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connectDb } from "@/lib/db";
 import { Sale } from "@/models/Sale";
 import { Customer } from "@/models/Customer";
+import { Product } from "@/models/Product";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 
@@ -36,7 +37,17 @@ export default async function SalesPage({
           customerId?: unknown | null;
           customerName?: string;
           paymentMethod?: string;
-          items?: unknown[];
+          items?: Array<{
+            productId: unknown;
+            qty: number;
+            qtyUnit?: string;
+            qtyEntered?: number;
+            unitPrice?: number;
+            unitPricePerPiece?: number;
+            unitCostPerPiece?: number;
+            piecesSold?: number;
+            lineProfit?: number;
+          }>;
           totalRevenue: number;
           profit: number;
         }>
@@ -44,6 +55,70 @@ export default async function SalesPage({
     Sale.countDocuments(filter),
     Customer.find().lean<Array<{ _id: unknown; name: string }>>(),
   ]);
+
+  const productIds = Array.from(
+    new Set(sales.flatMap((s) => (s.items ?? []).map((it) => String(it.productId))).filter(Boolean))
+  );
+  const products = await Product.find({ _id: { $in: productIds } }).lean<
+    Array<{ _id: unknown; name: string; unit?: string; piecesPerStrip?: number }>
+  >();
+  const productMap = new Map(products.map((p) => [String(p._id), p]));
+
+  function formatSaleItems(
+    items:
+      | Array<{
+          productId: unknown;
+          qty: number; // stock unit (strip for strip products; can be fractional)
+          qtyUnit?: string;
+          qtyEntered?: number;
+          unitPrice?: number; // entered
+          unitPricePerPiece?: number;
+          unitCost?: number; // stock unit cost
+          unitCostPerPiece?: number;
+          piecesSold?: number;
+          lineProfit?: number;
+        }>
+      | undefined
+  ) {
+    if (!items?.length) return "-";
+    const parts = items.map((it) => {
+      const pid = String(it.productId);
+      const p = productMap.get(pid);
+      const name = p?.name ?? "Unknown";
+      const pps = Math.max(1, Number(p?.piecesPerStrip || 1));
+      const piecesSold =
+        typeof it.piecesSold === "number"
+          ? it.piecesSold
+          : p?.unit === "strip" && pps > 1
+            ? Number(it.qty || 0) * pps
+            : Number(it.qty || 0);
+      const stripsSold = p?.unit === "strip" && pps > 1 ? piecesSold / pps : null;
+
+      const buyPerPc =
+        typeof it.unitCostPerPiece === "number"
+          ? it.unitCostPerPiece
+          : p?.unit === "strip" && pps > 1
+            ? Number(it.unitCost || 0) / pps
+            : Number(it.unitCost || 0);
+      const sellPerPc =
+        typeof it.unitPricePerPiece === "number"
+          ? it.unitPricePerPiece
+          : Number(it.unitPrice || 0);
+
+      const profitPerPc = Math.max(0, sellPerPc - buyPerPc);
+      const profitLine = Math.max(0, profitPerPc * piecesSold);
+
+      const qtyLabel =
+        p?.unit === "strip" && pps > 1
+          ? `${piecesSold.toFixed(0)} pcs (${Number(stripsSold || 0).toFixed(2).replace(/\.00$/, "")} strips)`
+          : `${piecesSold.toFixed(0)} pcs`;
+
+      return `${name}: ${qtyLabel} | Buy/pc ₹${buyPerPc.toFixed(2)} | Sell/pc ₹${sellPerPc.toFixed(
+        2
+      )} | Profit/pc ₹${profitPerPc.toFixed(2)} | Profit ₹${profitLine.toFixed(2)}`;
+    });
+    return `${parts.slice(0, 3).join(", ")}${parts.length > 3 ? ` +${parts.length - 3} more` : ""}`;
+  }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -102,6 +177,7 @@ export default async function SalesPage({
                 <tr>
                   <th className="py-2">Date</th>
                   <th className="py-2">Customer</th>
+                  <th className="py-2">Payment</th>
                   <th className="py-2">Items</th>
                   <th className="py-2">Revenue</th>
                   <th className="py-2">Profit</th>
@@ -119,7 +195,8 @@ export default async function SalesPage({
                         ? customerMap.get(String(s.customerId)) ?? "-"
                         : s.customerName || "Walk-in"}
                     </td>
-                    <td className="py-2 text-zinc-300">{s.items?.length ?? 0}</td>
+                    <td className="py-2 text-zinc-300">{s.paymentMethod || "-"}</td>
+                    <td className="py-2 text-zinc-300">{formatSaleItems(s.items)}</td>
                     <td className="py-2 font-medium">
                       ₹ {Number(s.totalRevenue).toFixed(2)}
                     </td>
@@ -142,7 +219,7 @@ export default async function SalesPage({
                 ))}
                 {!sales.length ? (
                   <tr>
-                    <td className="py-6 text-sm text-zinc-400" colSpan={6}>
+                    <td className="py-6 text-sm text-zinc-400" colSpan={7}>
                       No sales yet.
                     </td>
                   </tr>

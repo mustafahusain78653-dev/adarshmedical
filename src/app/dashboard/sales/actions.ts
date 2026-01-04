@@ -8,8 +8,8 @@ import { Sale } from "@/models/Sale";
 
 const requestItemSchema = z.object({
   productId: z.string().min(1),
-  qty: z.coerce.number().int().positive(),
-  unitPrice: z.coerce.number().nonnegative(),
+  qtyPieces: z.coerce.number().int().positive(),
+  unitPricePerPiece: z.coerce.number().positive(),
 });
 
 export async function createSaleAction(formData: FormData) {
@@ -17,7 +17,6 @@ export async function createSaleAction(formData: FormData) {
   const customerName = String(formData.get("customerName") ?? "");
   const paymentMethod = String(formData.get("paymentMethod") ?? "cash");
   const soldAtStr = String(formData.get("soldAt") ?? "");
-  const notes = String(formData.get("notes") ?? "");
   const itemsJson = String(formData.get("itemsJson") ?? "[]");
 
   let rawItems: unknown = [];
@@ -50,7 +49,12 @@ export async function createSaleAction(formData: FormData) {
     batchNo: string;
     expiryDate: Date;
     qty: number;
+    qtyUnit: "piece";
+    qtyEntered: number;
     unitPrice: number;
+    unitPricePerPiece: number;
+    unitCostPerPiece: number;
+    piecesSold: number;
     unitCost: number;
     lineRevenue: number;
     lineCost: number;
@@ -65,49 +69,72 @@ export async function createSaleAction(formData: FormData) {
     const product = await Product.findById(req.productId);
     if (!product) redirect("/dashboard/sales/new");
 
+    const piecesPerStrip = Math.max(1, Number((product as any).piecesPerStrip || 10));
+    const qtyPieces = Number(req.qtyPieces);
+    const unitPricePerPiece = Number(req.unitPricePerPiece);
+    const stripsNeeded = qtyPieces / piecesPerStrip;
+
+    const purchasePriceDefault = Number((product as any).purchasePriceDefault || 0);
+    const unitCostStock =
+      Number.isFinite(purchasePriceDefault) && purchasePriceDefault > 0 ? purchasePriceDefault : 0;
+    const unitCostPerPiece = unitCostStock / piecesPerStrip;
+
     const productBatches = product.batches as unknown as ProductBatch[];
-    const batches = [...productBatches]
-      .filter((b) => Number(b.qty) > 0)
-      .sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
+    const defaultBatchNo = "DEFAULT";
+    const defaultExpiryDate = new Date("2099-12-31T00:00:00.000Z");
 
-    let remaining = req.qty;
-
-    const consumeFromBatch = (b: ProductBatch, takeQty: number) => {
-      b.qty = Number(b.qty) - takeQty;
-      const lineRevenue = takeQty * req.unitPrice;
-      const lineCost = takeQty * Number(b.unitCost);
-      saleItems.push({
-        productId: product._id,
-        batchNo: String(b.batchNo),
-        expiryDate: b.expiryDate,
-        qty: takeQty,
-        unitPrice: req.unitPrice,
-        unitCost: Number(b.unitCost),
-        lineRevenue,
-        lineCost,
-        lineProfit: lineRevenue - lineCost,
-      });
-      totalRevenue += lineRevenue;
-      totalCost += lineCost;
-    };
-
-    for (const b of batches) {
-      if (remaining <= 0) break;
-      const take = Math.min(remaining, Number(b.qty));
-      consumeFromBatch(b, take);
-      remaining -= take;
+    let def = productBatches.find(
+      (b) =>
+        String(b.batchNo).toLowerCase() === defaultBatchNo.toLowerCase() &&
+        new Date(b.expiryDate).toISOString().slice(0, 10) === defaultExpiryDate.toISOString().slice(0, 10)
+    );
+    if (!def) {
+      def = {
+        batchNo: defaultBatchNo,
+        expiryDate: defaultExpiryDate,
+        qty: 0,
+        unitCost: unitCostStock,
+        unitPrice: 0,
+      };
+      product.batches.push(def as any);
+    } else if (unitCostStock > 0) {
+      def.unitCost = unitCostStock;
     }
-    if (remaining > 0) redirect("/dashboard/sales/new");
+
+    const available = Math.max(0, Number(def.qty) || 0);
+    const stripsConsumed = Math.min(available, stripsNeeded);
+    def.qty = available - stripsConsumed;
 
     await product.save();
+
+    const lineRevenue = Math.max(0, qtyPieces * unitPricePerPiece);
+    const lineCost = Math.max(0, qtyPieces * unitCostPerPiece);
+    const lineProfit = Math.max(0, lineRevenue - lineCost);
+    saleItems.push({
+      productId: product._id,
+      batchNo: defaultBatchNo,
+      expiryDate: defaultExpiryDate,
+      qty: stripsConsumed,
+      qtyUnit: "piece",
+      qtyEntered: qtyPieces,
+      unitPrice: unitPricePerPiece,
+      unitPricePerPiece,
+      unitCostPerPiece,
+      piecesSold: qtyPieces,
+      unitCost: unitCostStock,
+      lineRevenue,
+      lineCost,
+      lineProfit,
+    });
+    totalRevenue += lineRevenue;
+    totalCost += lineCost;
   }
 
-  const profit = totalRevenue - totalCost;
+  const profit = Math.max(0, totalRevenue - totalCost);
   await Sale.create({
     customerId: customerId || null,
     customerName,
     paymentMethod,
-    notes,
     soldAt,
     items: saleItems,
     totalRevenue,
@@ -130,8 +157,10 @@ export async function deleteSaleAction(formData: FormData) {
       batchNo: string;
       expiryDate: Date | null;
       qty: number;
+      qtyUnit?: string;
       unitCost: number;
       unitPrice: number;
+      unitPricePerPiece?: number;
     }>;
   }>();
   if (!sale) redirect("/dashboard/sales");
@@ -153,12 +182,23 @@ export async function deleteSaleAction(formData: FormData) {
       product.batches[idx].qty = Number(product.batches[idx].qty) + Number(it.qty);
     } else {
       // batch missing, recreate (best-effort)
+      const piecesPerStrip = Math.max(1, Number((product as any).piecesPerStrip || 1));
+      const productUnit = String((product as any).unit || "strip");
+      const isStripProduct = productUnit === "strip" && piecesPerStrip > 1;
+      const derivedUnitPricePerPiece =
+        typeof it.unitPricePerPiece === "number"
+          ? it.unitPricePerPiece
+          : isStripProduct && String(it.qtyUnit || "piece") === "strip"
+            ? Number(it.unitPrice || 0) / piecesPerStrip
+            : Number(it.unitPrice || 0);
+      const unitPriceStock = isStripProduct ? derivedUnitPricePerPiece * piecesPerStrip : derivedUnitPricePerPiece;
+
       product.batches.push({
         batchNo: String(it.batchNo || "UNKNOWN"),
         expiryDate: it.expiryDate ? new Date(it.expiryDate) : new Date(),
         qty: Number(it.qty),
         unitCost: Number(it.unitCost || 0),
-        unitPrice: Number(it.unitPrice || 0),
+        unitPrice: Number(unitPriceStock || 0),
       });
     }
     await product.save();

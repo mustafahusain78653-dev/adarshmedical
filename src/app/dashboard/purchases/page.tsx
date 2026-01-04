@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connectDb } from "@/lib/db";
 import { Purchase } from "@/models/Purchase";
 import { Supplier } from "@/models/Supplier";
+import { Product } from "@/models/Product";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 
@@ -12,20 +13,60 @@ export default async function PurchasesPage({
 }) {
   await connectDb();
   const sp = (await searchParams) ?? {};
-  const q = (sp.q ?? "").trim();
   const pageSize = 20;
   const page = Math.max(1, Number(sp.page ?? "1") || 1);
-  const filter = q ? { invoiceNo: { $regex: q, $options: "i" } } : {};
+  const filter = {};
 
   const [purchases, total, suppliers] = await Promise.all([
     Purchase.find(filter)
       .sort({ purchasedAt: -1 })
       .skip((page - 1) * pageSize)
       .limit(pageSize)
-      .lean<Array<{ _id: unknown; supplierId?: unknown | null; invoiceNo?: string; items?: unknown[]; totalCost: number; purchasedAt: Date }>>(),
+      .lean<
+        Array<{
+          _id: unknown;
+          supplierId?: unknown | null;
+          items?: Array<{
+            productId: unknown;
+            qty: number;
+            piecesPerStrip?: number;
+            unitCost?: number;
+          }>;
+          totalCost: number;
+          purchasedAt: Date;
+        }>
+      >(),
     Purchase.countDocuments(filter),
     Supplier.find().lean<Array<{ _id: unknown; name: string }>>(),
   ]);
+
+  const productIds = Array.from(
+    new Set(
+      purchases.flatMap((p) => (p.items ?? []).map((it) => String(it.productId))).filter(Boolean)
+    )
+  );
+  const products = await Product.find({ _id: { $in: productIds } }).lean<
+    Array<{ _id: unknown; name: string }>
+  >();
+  const productMap = new Map(products.map((p) => [String(p._id), p]));
+
+  function formatItem(it: {
+    productId: unknown;
+    qty: number;
+    piecesPerStrip?: number;
+    unitCost?: number;
+  }) {
+    const p = productMap.get(String(it.productId));
+    const name = p?.name ?? "Unknown";
+    const qtyStrips = Number(it.qty || 0);
+    const pps = Math.max(1, Number(it.piecesPerStrip || 10));
+    const costPerStrip = Number(it.unitCost ?? 0);
+    const costPerPiece = pps > 0 ? costPerStrip / pps : 0;
+    const totalPieces = Math.max(0, Math.floor(qtyStrips * pps + 1e-9));
+    return `${name}: ${qtyStrips} strip | ${pps} pcs/strip (${totalPieces} pcs) | Cost/strip ₹${costPerStrip.toFixed(
+      2
+    )} | Cost/pc ₹${costPerPiece.toFixed(2)}`;
+  }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -42,17 +83,6 @@ export default async function PurchasesPage({
           <p className="text-sm text-zinc-400">Stock-in entries (supplier invoices).</p>
         </div>
         <div className="flex gap-2">
-          <form className="flex gap-2" action="/dashboard/purchases" method="get">
-            <input
-              name="q"
-              defaultValue={q}
-              placeholder="Search invoice..."
-              className="w-56 rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-zinc-200"
-            />
-            <button className="rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 hover:bg-zinc-900/60">
-              Search
-            </button>
-          </form>
           <Link
             href="/dashboard/purchases/new"
             className="rounded-lg bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-white"
@@ -86,7 +116,6 @@ export default async function PurchasesPage({
                 <tr>
                   <th className="py-2">Date</th>
                   <th className="py-2">Supplier</th>
-                  <th className="py-2">Invoice</th>
                   <th className="py-2">Items</th>
                   <th className="py-2">Total Cost</th>
                   <th className="py-2 text-right">Actions</th>
@@ -101,8 +130,13 @@ export default async function PurchasesPage({
                     <td className="py-2 font-medium">
                       {p.supplierId ? supplierMap.get(String(p.supplierId)) ?? "-" : "-"}
                     </td>
-                    <td className="py-2 text-zinc-300">{p.invoiceNo || "-"}</td>
-                    <td className="py-2 text-zinc-300">{p.items?.length ?? 0}</td>
+                    <td className="py-2 text-zinc-300">
+                      {p.items?.length
+                        ? `${(p.items ?? []).slice(0, 3).map(formatItem).join(", ")}${
+                            (p.items?.length ?? 0) > 3 ? ` +${(p.items?.length ?? 0) - 3} more` : ""
+                          }`
+                        : "-"}
+                    </td>
                     <td className="py-2 font-medium">₹ {Number(p.totalCost).toFixed(2)}</td>
                     <td className="py-2">
                       <div className="flex justify-end gap-2">
@@ -120,7 +154,7 @@ export default async function PurchasesPage({
                 ))}
                 {!purchases.length ? (
                   <tr>
-                    <td className="py-6 text-sm text-zinc-400" colSpan={6}>
+                    <td className="py-6 text-sm text-zinc-400" colSpan={5}>
                       No purchases yet.
                     </td>
                   </tr>

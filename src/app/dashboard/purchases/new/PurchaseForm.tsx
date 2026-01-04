@@ -6,17 +6,20 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
-type Option = { id: string; name: string; purchasePriceDefault?: number; salePriceDefault?: number };
+type Option = {
+  id: string;
+  name: string;
+  piecesPerStrip?: number;
+  purchasePriceDefault?: number;
+};
 type SupplierOption = { id: string; name: string };
 
 type Item = {
   rowId: string;
   productId: string;
-  batchNo: string;
-  expiryDate: string;
-  qty: number;
-  unitCost: number;
-  unitPrice: number;
+  qtyStrips: number;
+  piecesPerStrip: number;
+  costPerStrip: number | "";
 };
 
 export function PurchaseForm({
@@ -30,10 +33,20 @@ export function PurchaseForm({
   const [isPending, startTransition] = useTransition();
   const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const [items, setItems] = useState<Item[]>([
-    { rowId: nanoid(), productId: "", batchNo: "", expiryDate: "", qty: 1, unitCost: 0, unitPrice: 0 },
+    {
+      rowId: nanoid(),
+      productId: "",
+      qtyStrips: 1,
+      piecesPerStrip: 10,
+      costPerStrip: "",
+    },
   ]);
 
-  const totalCost = items.reduce((sum, it) => sum + (Number(it.qty) || 0) * (Number(it.unitCost) || 0), 0);
+  const totalCost = items.reduce(
+    (sum, it) =>
+      sum + (Number(it.qtyStrips) || 0) * (typeof it.costPerStrip === "number" ? it.costPerStrip : 0),
+    0
+  );
 
   function updateItem(idx: number, patch: Partial<Item>) {
     setItems((prev) => prev.map((x, i) => (i === idx ? { ...x, ...patch } : x)));
@@ -42,7 +55,13 @@ export function PurchaseForm({
   function addRow() {
     setItems((prev) => [
       ...prev,
-      { rowId: nanoid(), productId: "", batchNo: "", expiryDate: "", qty: 1, unitCost: 0, unitPrice: 0 },
+      {
+        rowId: nanoid(),
+        productId: "",
+        qtyStrips: 1,
+        piecesPerStrip: 10,
+        costPerStrip: "",
+      },
     ]);
   }
 
@@ -58,18 +77,17 @@ export function PurchaseForm({
         const invalid = items.some(
           (it) =>
             !it.productId ||
-            !it.batchNo.trim() ||
-            !it.expiryDate ||
-            !Number.isFinite(it.qty) ||
-            it.qty <= 0 ||
-            !Number.isFinite(it.unitCost) ||
-            it.unitCost < 0 ||
-            !Number.isFinite(it.unitPrice) ||
-            it.unitPrice < 0
+            !Number.isFinite(it.qtyStrips) ||
+            it.qtyStrips <= 0 ||
+            !Number.isFinite(it.piecesPerStrip) ||
+            it.piecesPerStrip <= 0 ||
+            typeof it.costPerStrip !== "number" ||
+            !Number.isFinite(it.costPerStrip) ||
+            it.costPerStrip <= 0
         );
         if (invalid) {
           e.preventDefault();
-          toast.error("Please fill all item fields (product, batch, expiry, qty, cost, price).");
+          toast.error("Please fill all item fields (product, qty strips, pieces/strip, cost/strip).");
           return;
         }
 
@@ -77,25 +95,19 @@ export function PurchaseForm({
 
         const fd = new FormData(e.currentTarget);
         const supplierId = String(fd.get("supplierId") ?? "");
-        const invoiceNo = String(fd.get("invoiceNo") ?? "");
         const purchasedAt = String(fd.get("purchasedAt") ?? "");
-        const notes = String(fd.get("notes") ?? "");
 
         const res = await fetch("/api/purchases", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             supplierId,
-            invoiceNo,
             purchasedAt,
-            notes,
             items: items.map((it) => ({
               productId: it.productId,
-              batchNo: it.batchNo,
-              expiryDate: it.expiryDate,
-              qty: Number(it.qty),
-              unitCost: Number(it.unitCost),
-              unitPrice: Number(it.unitPrice),
+              qtyStrips: Number(it.qtyStrips),
+              piecesPerStrip: Number(it.piecesPerStrip),
+              costPerStrip: Number(it.costPerStrip),
             })),
           }),
         });
@@ -115,7 +127,7 @@ export function PurchaseForm({
         });
       }}
     >
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-1">
           <label className="text-sm font-medium">Supplier</label>
           <select
@@ -130,14 +142,6 @@ export function PurchaseForm({
               </option>
             ))}
           </select>
-        </div>
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Invoice No</label>
-          <input
-            name="invoiceNo"
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-zinc-200"
-            placeholder="Optional"
-          />
         </div>
         <div className="space-y-1">
           <label className="text-sm font-medium">Purchase Date</label>
@@ -165,11 +169,12 @@ export function PurchaseForm({
             <thead className="border-b border-zinc-800 text-xs text-zinc-400">
               <tr>
                 <th className="py-2">Product</th>
-                <th className="py-2">Batch</th>
-                <th className="py-2">Expiry</th>
-                <th className="py-2">Qty</th>
-                <th className="py-2">Unit Cost</th>
-                <th className="py-2">Unit Price</th>
+                <th className="py-2">Unit</th>
+                <th className="py-2">Qty (strips)</th>
+                <th className="py-2">Pieces/Strip</th>
+                <th className="py-2">Total Pieces</th>
+                <th className="py-2">Cost/Strip</th>
+                <th className="py-2">Cost/Piece</th>
                 <th className="py-2 text-right">Remove</th>
               </tr>
             </thead>
@@ -184,8 +189,11 @@ export function PurchaseForm({
                         const p = productMap.get(id);
                         updateItem(idx, {
                           productId: id,
-                          unitCost: Number(p?.purchasePriceDefault ?? 0),
-                          unitPrice: Number(p?.salePriceDefault ?? 0),
+                          piecesPerStrip: Math.max(1, Number(p?.piecesPerStrip || 10)),
+                          costPerStrip:
+                            Number(p?.purchasePriceDefault || 0) > 0
+                              ? Number(p?.purchasePriceDefault)
+                              : "",
                         });
                       }}
                       className="w-56 rounded-lg border border-zinc-800 bg-zinc-950/60 px-2 py-1.5 text-sm text-zinc-100 outline-none focus:border-zinc-200"
@@ -198,50 +206,49 @@ export function PurchaseForm({
                       ))}
                     </select>
                   </td>
+                  <td className="py-2 text-zinc-300">Strip</td>
                   <td className="py-2">
                     <input
-                      value={it.batchNo}
-                      onChange={(e) => updateItem(idx, { batchNo: e.target.value })}
-                      className="w-32 rounded-lg border border-zinc-800 bg-zinc-950/60 px-2 py-1.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-zinc-200"
-                      placeholder="B123"
-                    />
-                  </td>
-                  <td className="py-2">
-                    <input
-                      value={it.expiryDate}
-                      onChange={(e) => updateItem(idx, { expiryDate: e.target.value })}
-                      type="date"
-                      className="w-40 rounded-lg border border-zinc-800 bg-zinc-950/60 px-2 py-1.5 text-sm text-zinc-100 outline-none focus:border-zinc-200"
-                    />
-                  </td>
-                  <td className="py-2">
-                    <input
-                      value={it.qty}
-                      onChange={(e) => updateItem(idx, { qty: Number(e.target.value) })}
+                      value={it.qtyStrips}
+                      onChange={(e) => updateItem(idx, { qtyStrips: Number(e.target.value) })}
                       type="number"
                       min={1}
-                      className="w-20 rounded-lg border border-zinc-800 bg-zinc-950/60 px-2 py-1.5 text-sm text-zinc-100 outline-none focus:border-zinc-200"
+                      step={1}
+                      className="w-24 rounded-lg border border-zinc-800 bg-zinc-950/60 px-2 py-1.5 text-sm text-zinc-100 outline-none focus:border-zinc-200"
                     />
                   </td>
                   <td className="py-2">
                     <input
-                      value={it.unitCost === 0 ? "" : it.unitCost}
-                      onChange={(e) => updateItem(idx, { unitCost: Number(e.target.value) })}
+                      value={it.piecesPerStrip}
+                      onChange={(e) =>
+                        updateItem(idx, { piecesPerStrip: Math.max(1, Number(e.target.value) || 1) })
+                      }
                       type="number"
-                      step="0.01"
-                      min={0}
+                      step={1}
+                      min={1}
                       className="w-28 rounded-lg border border-zinc-800 bg-zinc-950/60 px-2 py-1.5 text-sm text-zinc-100 outline-none focus:border-zinc-200"
                     />
                   </td>
+                  <td className="py-2 text-zinc-300">
+                    {Number(it.qtyStrips || 0) * Math.max(1, Number(it.piecesPerStrip || 1))}
+                  </td>
                   <td className="py-2">
                     <input
-                      value={it.unitPrice === 0 ? "" : it.unitPrice}
-                      onChange={(e) => updateItem(idx, { unitPrice: Number(e.target.value) })}
+                      value={it.costPerStrip}
+                      onChange={(e) =>
+                        updateItem(idx, { costPerStrip: e.target.value === "" ? "" : Number(e.target.value) })
+                      }
                       type="number"
                       step="0.01"
-                      min={0}
+                      min={0.01}
                       className="w-28 rounded-lg border border-zinc-800 bg-zinc-950/60 px-2 py-1.5 text-sm text-zinc-100 outline-none focus:border-zinc-200"
                     />
+                  </td>
+                  <td className="py-2 text-zinc-300">
+                    {(() => {
+                      if (typeof it.costPerStrip !== "number") return "-";
+                      return (it.costPerStrip / Math.max(1, Number(it.piecesPerStrip || 1))).toFixed(2);
+                    })()}
                   </td>
                   <td className="py-2 text-right">
                     <button
@@ -266,15 +273,6 @@ export function PurchaseForm({
           <div className="text-xs text-zinc-400">Total Cost</div>
           <div className="text-xl font-semibold">₹ {totalCost.toFixed(2)}</div>
         </div>
-      </div>
-
-      <div className="space-y-1">
-        <label className="text-sm font-medium">Notes</label>
-        <input
-          name="notes"
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-zinc-200"
-          placeholder="Optional"
-        />
       </div>
 
       <button

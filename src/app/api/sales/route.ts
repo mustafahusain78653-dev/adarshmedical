@@ -6,8 +6,8 @@ import { Sale } from "@/models/Sale";
 
 const itemSchema = z.object({
   productId: z.string().min(1),
-  qty: z.coerce.number().int().positive(),
-  unitPrice: z.coerce.number().nonnegative(),
+  qtyPieces: z.coerce.number().int().positive(),
+  unitPricePerPiece: z.coerce.number().positive(),
 });
 
 const createSchema = z.object({
@@ -15,7 +15,6 @@ const createSchema = z.object({
   customerName: z.string().optional().default(""),
   paymentMethod: z.string().optional().default("cash"),
   soldAt: z.string().optional().default(""),
-  notes: z.string().optional().default(""),
   items: z.array(itemSchema).min(1),
 });
 
@@ -48,7 +47,11 @@ export async function POST(req: Request) {
     batchNo: string;
     expiryDate: Date;
     qty: number;
+    qtyEntered: number;
     unitPrice: number;
+    unitPricePerPiece: number;
+    unitCostPerPiece: number;
+    piecesSold: number;
     unitCost: number;
     lineRevenue: number;
     lineCost: number;
@@ -63,50 +66,74 @@ export async function POST(req: Request) {
     const product = await Product.findById(reqItem.productId);
     if (!product) return jsonError(404, "Product not found", "PRODUCT_NOT_FOUND");
 
+    const piecesPerStrip = Math.max(1, Number((product as any).piecesPerStrip || 10));
+    const qtyPieces = Number(reqItem.qtyPieces);
+    const unitPricePerPiece = Number(reqItem.unitPricePerPiece);
+
+    const defaultBatchNo = "DEFAULT";
+    const defaultExpiryDate = new Date("2099-12-31T00:00:00.000Z");
+
+    const stripsNeeded = qtyPieces / piecesPerStrip;
+
     const productBatches = product.batches as unknown as ProductBatch[];
-    const batches = [...productBatches]
-      .filter((b) => Number(b.qty) > 0)
-      .sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
+    const stockStrips = productBatches.reduce((sum, b) => sum + Number(b.qty || 0), 0);
 
-    let remaining = reqItem.qty;
+    // Cost basis comes from last purchase cost/strip stored on product (set by Purchases)
+    const purchasePriceDefault = Number((product as any).purchasePriceDefault || 0);
+    const unitCost = Number.isFinite(purchasePriceDefault) && purchasePriceDefault > 0 ? purchasePriceDefault : 0;
+    const unitCostPerPiece = unitCost / piecesPerStrip;
 
-    const consumeFromBatch = (b: ProductBatch, takeQty: number) => {
-      b.qty = Number(b.qty) - takeQty;
-      const lineRevenue = takeQty * reqItem.unitPrice;
-      const lineCost = takeQty * Number(b.unitCost);
-      saleItems.push({
-        productId: product._id,
-        batchNo: String(b.batchNo),
-        expiryDate: b.expiryDate,
-        qty: takeQty,
-        unitPrice: reqItem.unitPrice,
-        unitCost: Number(b.unitCost),
-        lineRevenue,
-        lineCost,
-        lineProfit: lineRevenue - lineCost,
-      });
-      totalRevenue += lineRevenue;
-      totalCost += lineCost;
-    };
+    const unitPrice = unitPricePerPiece; // entered
 
-    for (const b of batches) {
-      if (remaining <= 0) break;
-      const take = Math.min(remaining, Number(b.qty));
-      consumeFromBatch(b, take);
-      remaining -= take;
+    // Consume from DEFAULT batch only (single-batch system).
+    // IMPORTANT: Sales are NOT blocked by stock. If stock is insufficient, we consume
+    // what we can (down to 0) and still record the sale (so deleting the sale won't
+    // incorrectly add stock that never existed).
+    let def = productBatches.find(
+      (b) =>
+        String(b.batchNo).toLowerCase() === defaultBatchNo.toLowerCase() &&
+        new Date(b.expiryDate).toISOString().slice(0, 10) === defaultExpiryDate.toISOString().slice(0, 10)
+    );
+    if (!def) {
+      // If stock exists but batch isn't found (legacy data), create it.
+      def = { batchNo: defaultBatchNo, expiryDate: defaultExpiryDate, qty: 0, unitCost, unitPrice: 0 };
+      product.batches.push(def as any);
     }
 
-    if (remaining > 0) return jsonError(409, "Not enough stock", "STOCK");
+    const availableInDefault = Math.max(0, Number(def.qty) || 0);
+    const stripsConsumed = Math.min(availableInDefault, stripsNeeded);
+    def.qty = availableInDefault - stripsConsumed;
 
     await product.save();
+
+    const lineRevenue = Math.max(0, qtyPieces * unitPricePerPiece);
+    const lineCost = Math.max(0, qtyPieces * unitCostPerPiece);
+    const lineProfit = Math.max(0, lineRevenue - lineCost);
+
+    saleItems.push({
+      productId: product._id,
+      batchNo: defaultBatchNo,
+      expiryDate: defaultExpiryDate,
+      qty: stripsConsumed, // strips actually consumed from stock (can be fractional)
+      qtyEntered: qtyPieces,
+      unitPrice,
+      unitPricePerPiece,
+      unitCostPerPiece,
+      piecesSold: qtyPieces,
+      unitCost,
+      lineRevenue,
+      lineCost,
+      lineProfit,
+    });
+    totalRevenue += lineRevenue;
+    totalCost += lineCost;
   }
 
-  const profit = totalRevenue - totalCost;
+  const profit = Math.max(0, totalRevenue - totalCost);
   const sale = await Sale.create({
     customerId: parsed.data.customerId || null,
     customerName: parsed.data.customerName,
     paymentMethod: parsed.data.paymentMethod,
-    notes: parsed.data.notes,
     soldAt,
     items: saleItems,
     totalRevenue,

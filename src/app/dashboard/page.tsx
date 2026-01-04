@@ -102,37 +102,6 @@ export default async function DashboardPage() {
     value: Number(x.revenue || 0),
   }));
 
-  type LowStockRow = { _id: unknown; name: string; minStock: number; stockQty: number };
-  type ExpiringRow = { _id: unknown; name: string; batchNo: string; expiryDate: Date; qty: number };
-
-  const lowStock = await Product.aggregate<LowStockRow>([
-    { $addFields: { stockQty: { $sum: "$batches.qty" } } },
-    { $match: { $expr: { $lt: ["$stockQty", "$minStock"] } } },
-    { $sort: { stockQty: 1 } },
-    { $limit: 8 },
-    { $project: { name: 1, minStock: 1, stockQty: 1 } },
-  ]);
-
-  const expiringSoon = await Product.aggregate<ExpiringRow>([
-    { $unwind: "$batches" },
-    {
-      $match: {
-        "batches.qty": { $gt: 0 },
-        "batches.expiryDate": { $gte: todayStart, $lt: addDays(todayStart, 30) },
-      },
-    },
-    { $sort: { "batches.expiryDate": 1 } },
-    { $limit: 8 },
-    {
-      $project: {
-        name: 1,
-        batchNo: "$batches.batchNo",
-        expiryDate: "$batches.expiryDate",
-        qty: "$batches.qty",
-      },
-    },
-  ]);
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
@@ -231,60 +200,6 @@ export default async function DashboardPage() {
               <PaymentPie data={paymentData} />
             ) : (
               <div className="text-sm text-zinc-400">No sales this month yet.</div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Low Stock</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {lowStock.length ? (
-              <div className="space-y-2">
-                {lowStock.map((p) => (
-                  <div
-                    key={String(p._id)}
-                    className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm"
-                  >
-                    <div className="font-medium">{p.name}</div>
-                    <div className="text-zinc-300">
-                      {p.stockQty} / min {p.minStock}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-sm text-zinc-400">No low-stock items.</div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Expiring Soon (30 days)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {expiringSoon.length ? (
-              <div className="space-y-2">
-                {expiringSoon.map((x) => (
-                  <div
-                    key={`${x._id}-${x.batchNo}`}
-                    className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm"
-                  >
-                    <div>
-                      <div className="font-medium">{x.name}</div>
-                      <div className="text-xs text-zinc-400">Batch: {x.batchNo}</div>
-                    </div>
-                    <div className="text-right text-zinc-300">
-                      <div>{new Date(x.expiryDate).toLocaleDateString()}</div>
-                      <div className="text-xs">Qty: {x.qty}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-sm text-zinc-400">No expiring batches soon.</div>
             )}
           </CardContent>
         </Card>

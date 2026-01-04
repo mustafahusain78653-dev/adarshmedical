@@ -14,7 +14,14 @@ export default async function NewPurchasePage({
     Supplier.find().sort({ name: 1 }).lean<Array<{ _id: unknown; name: string }>>(),
     Product.find({ isActive: true })
       .sort({ name: 1 })
-      .lean<Array<{ _id: unknown; name: string; purchasePriceDefault?: number; salePriceDefault?: number }>>(),
+      .lean<
+        Array<{
+          _id: unknown;
+          name: string;
+          piecesPerStrip?: number;
+          purchasePriceDefault?: number;
+        }>
+      >(),
   ]);
 
   return (
@@ -42,8 +49,8 @@ export default async function NewPurchasePage({
             products={products.map((p) => ({
               id: String(p._id),
               name: p.name,
+              piecesPerStrip: Number(p.piecesPerStrip || 1),
               purchasePriceDefault: Number(p.purchasePriceDefault || 0),
-              salePriceDefault: Number(p.salePriceDefault || 0),
             }))}
           />
         </CardContent>

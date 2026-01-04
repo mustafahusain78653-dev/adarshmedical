@@ -5,15 +5,9 @@ import { Product } from "@/models/Product";
 
 const schema = z.object({
   name: z.string().min(1),
-  genericName: z.string().optional().default(""),
   brand: z.string().optional().default(""),
-  unit: z.string().optional().default("strip"),
   categoryId: z.string().optional().default(""),
   defaultSupplierId: z.string().optional().default(""),
-  purchasePriceDefault: z.coerce.number().min(0).default(0),
-  salePriceDefault: z.coerce.number().min(0).default(0),
-  minStock: z.coerce.number().min(0).default(0),
-  isActive: z.coerce.boolean().default(true),
 });
 
 export async function POST(req: Request) {
@@ -30,6 +24,9 @@ export async function POST(req: Request) {
   await connectDb();
   const created = await Product.create({
     ...parsed.data,
+    // Internal defaults (hidden from UI)
+    unit: "strip",
+    isActive: true,
     categoryId: parsed.data.categoryId || null,
     defaultSupplierId: parsed.data.defaultSupplierId || null,
   });

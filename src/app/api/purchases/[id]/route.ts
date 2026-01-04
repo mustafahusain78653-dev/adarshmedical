@@ -10,7 +10,7 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
   await connectDb();
   const purchase = await Purchase.findById(id).lean<{
     _id: unknown;
-    items: Array<{ productId: unknown; batchNo: string; expiryDate: Date; qty: number }>;
+    items: Array<{ productId: unknown; batchNo: string; expiryDate: Date; qty: number; qtyBase?: number }>;
   }>();
   if (!purchase) return jsonError(404, "Purchase not found", "NOT_FOUND");
 
@@ -28,7 +28,8 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
     );
     if (idx < 0) return jsonError(409, "Batch not found", "BATCH");
 
-    const nextQty = Number(product.batches[idx].qty) - Number(it.qty);
+    const revertQty = Number(it.qtyBase ?? it.qty);
+    const nextQty = Number(product.batches[idx].qty) - revertQty;
     if (nextQty < 0) return jsonError(409, "Cannot revert below zero", "STOCK");
     product.batches[idx].qty = nextQty;
     await product.save();

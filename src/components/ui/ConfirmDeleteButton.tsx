@@ -12,11 +12,7 @@ export function ConfirmDeleteButton({
 }: {
   url: string;
   confirmMessage: string;
-  children: React.ReactElement<{
-    onClick?: React.MouseEventHandler;
-    disabled?: boolean;
-    type?: string;
-  }>;
+  children?: React.ReactNode;
   onSuccessRedirectTo?: string;
 }) {
   const router = useRouter();
@@ -32,9 +28,9 @@ export function ConfirmDeleteButton({
 
     const res = await fetch(url, { method: "DELETE" });
     if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as
-        | { error?: { message?: string } }
-        | null;
+      const body = (await res.json().catch(() => null)) as {
+        error?: { message?: string };
+      } | null;
       toast.error(body?.error?.message || "Delete failed.");
       return;
     }
@@ -46,18 +42,33 @@ export function ConfirmDeleteButton({
     });
   }
 
-  const existingOnClick = children.props.onClick;
-  const existingDisabled = Boolean(children.props.disabled);
-  const typeProp = children.props.type;
+  if (!React.isValidElement(children)) {
+    // Don't crash the whole page if someone accidentally renders this without a single element child.
+    return null;
+  }
 
-  return React.cloneElement(children, {
+  const childEl = children as React.ReactElement<{
+    onClick?: React.MouseEventHandler;
+    disabled?: boolean;
+    type?: string;
+  }>;
+
+  const childProps = (childEl.props ?? {}) as {
+    onClick?: React.MouseEventHandler;
+    disabled?: boolean;
+    type?: string;
+  };
+
+  const existingOnClick = childProps.onClick;
+  const existingDisabled = Boolean(childProps.disabled);
+  const typeProp = childProps.type;
+
+  return React.cloneElement(childEl, {
     onClick: async (e: React.MouseEvent) => {
       await onClick(e);
       existingOnClick?.(e);
     },
     disabled: existingDisabled || isPending,
-    ...(children.type === "button" && !typeProp ? { type: "button" } : null),
+    ...(childEl.type === "button" && !typeProp ? { type: "button" } : null),
   });
 }
-
-

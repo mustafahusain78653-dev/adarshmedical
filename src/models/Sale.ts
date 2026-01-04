@@ -5,8 +5,18 @@ const SaleItemSchema = new Schema(
     productId: { type: Schema.Types.ObjectId, ref: "Product", required: true },
     batchNo: { type: String, default: "", trim: true },
     expiryDate: { type: Date, default: null },
-    qty: { type: Number, required: true, min: 1 },
+    // qty is stored in product stock unit (strip for strip-products; can be fractional when selling pieces)
+    qty: { type: Number, required: true, min: 0 },
+    // How user entered the qty (strip/piece) for display purposes
+    qtyUnit: { type: String, default: "piece", trim: true },
+    qtyEntered: { type: Number, default: 0, min: 0 },
+    // unitPrice is entered price (per qtyUnit), unitPricePerPiece is computed and used for totals.
     unitPrice: { type: Number, required: true, min: 0 },
+    unitPricePerPiece: { type: Number, required: true, min: 0 },
+    // Computed cost per piece (derived from batch cost and piecesPerStrip)
+    unitCostPerPiece: { type: Number, required: true, min: 0 },
+    // Always stored as pieces for consistent display in UI/reports
+    piecesSold: { type: Number, required: true, min: 0 },
     unitCost: { type: Number, required: true, min: 0 },
     lineRevenue: { type: Number, required: true, min: 0 },
     lineCost: { type: Number, required: true, min: 0 },
@@ -36,6 +46,47 @@ export type SaleDoc = InferSchemaType<typeof SaleSchema> & {
   _id: mongoose.Types.ObjectId;
 };
 
-export const Sale = mongoose.models.Sale || mongoose.model("Sale", SaleSchema);
+// In Next.js dev with HMR, the model may already be compiled with an older schema.
+// Ensure newly added fields exist on the existing model schema too.
+const existingModel = mongoose.models.Sale as mongoose.Model<unknown> | undefined;
+if (existingModel) {
+  // Old schema versions used min: 1 for items.qty, which breaks fractional strip quantities (e.g. 0.1 strip).
+  const qtyPath = (existingModel.schema.path("items") as any)?.schema?.path?.("qty") as
+    | { options?: { min?: number }; validators?: Array<{ type?: string }> }
+    | undefined;
+  if (qtyPath) {
+    const currentMin = Number(qtyPath.options?.min);
+    if (!Number.isNaN(currentMin) && currentMin > 0) {
+      if (!qtyPath.options) qtyPath.options = {};
+      qtyPath.options.min = 0;
+      if (Array.isArray(qtyPath.validators)) {
+        qtyPath.validators = qtyPath.validators.filter((v) => v?.type !== "min");
+      }
+    }
+  }
+}
+if (existingModel && !existingModel.schema.path("items.unitPricePerPiece")) {
+  existingModel.schema.path("items").schema.add({
+    unitPricePerPiece: { type: Number, required: true, min: 0 },
+  });
+}
+if (existingModel && !existingModel.schema.path("items.unitCostPerPiece")) {
+  existingModel.schema.path("items").schema.add({
+    unitCostPerPiece: { type: Number, required: true, min: 0 },
+  });
+}
+if (existingModel && !existingModel.schema.path("items.piecesSold")) {
+  existingModel.schema.path("items").schema.add({
+    piecesSold: { type: Number, required: true, min: 0 },
+  });
+}
+if (existingModel && !existingModel.schema.path("items.qtyUnit")) {
+  existingModel.schema.path("items").schema.add({
+    qtyUnit: { type: String, default: "piece", trim: true },
+    qtyEntered: { type: Number, default: 0, min: 0 },
+  });
+}
+
+export const Sale = existingModel || mongoose.model("Sale", SaleSchema);
 
 

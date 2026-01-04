@@ -8,22 +8,15 @@ import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 
 export const dynamic = "force-dynamic";
 
-type Batch = { qty: number };
 type ProductLean = {
   _id: unknown;
   name: string;
-  genericName?: string;
   brand?: string;
-  unit?: string;
   categoryId?: unknown | null;
   defaultSupplierId?: unknown | null;
-  minStock?: number;
-  batches?: Batch[];
+  piecesPerStrip?: number;
+  batches?: Array<{ qty: number }>;
 };
-
-function stockQty(p: ProductLean) {
-  return (p.batches ?? []).reduce((sum, b) => sum + Number(b.qty || 0), 0);
-}
 
 export default async function ProductsPage({
   searchParams,
@@ -40,7 +33,6 @@ export default async function ProductsPage({
       ? {
           $or: [
             { name: { $regex: q, $options: "i" } },
-            { genericName: { $regex: q, $options: "i" } },
             { brand: { $regex: q, $options: "i" } },
           ],
         }
@@ -64,6 +56,15 @@ export default async function ProductsPage({
   const categoryMap = new Map(categories.map((c) => [String(c._id), c.name]));
   const supplierMap = new Map(suppliers.map((s) => [String(s._id), s.name]));
   const error = sp.error;
+
+  function formatRemaining(p: ProductLean) {
+    const pps = Math.max(1, Number(p.piecesPerStrip || 10));
+    const strips = (p.batches ?? []).reduce((sum, b) => sum + Number(b.qty || 0), 0);
+    const pieces = Math.max(0, Math.floor(strips * pps + 1e-9));
+    const fullStrips = Math.floor(pieces / pps);
+    const remPieces = pieces % pps;
+    return `${fullStrips} strips + ${remPieces} pcs (${pieces} pcs)`;
+  }
 
   return (
     <div className="space-y-6">
@@ -114,10 +115,10 @@ export default async function ProductsPage({
               <thead className="border-b border-zinc-800 text-xs text-zinc-400">
                 <tr>
                   <th className="py-2">Name</th>
+                  <th className="py-2">Brand</th>
                   <th className="py-2">Category</th>
                   <th className="py-2">Supplier</th>
-                  <th className="py-2">Stock</th>
-                  <th className="py-2">Min</th>
+                  <th className="py-2">Remaining</th>
                   <th className="py-2 text-right">Actions</th>
                 </tr>
               </thead>
@@ -126,18 +127,8 @@ export default async function ProductsPage({
                   <tr key={String(p._id)} className="border-b border-zinc-900/60">
                     <td className="py-2">
                       <div className="font-medium">{p.name}</div>
-                      <div className="text-xs text-zinc-400">
-                        {p.genericName || p.brand ? (
-                          <>
-                            {p.genericName ? `Generic: ${p.genericName}` : ""}
-                            {p.genericName && p.brand ? " • " : ""}
-                            {p.brand ? `Brand: ${p.brand}` : ""}
-                          </>
-                        ) : (
-                          <span>-</span>
-                        )}
-                      </div>
                     </td>
+                    <td className="py-2 text-zinc-300">{p.brand || "-"}</td>
                     <td className="py-2 text-zinc-300">
                       {p.categoryId ? categoryMap.get(String(p.categoryId)) ?? "-" : "-"}
                     </td>
@@ -146,8 +137,7 @@ export default async function ProductsPage({
                         ? supplierMap.get(String(p.defaultSupplierId)) ?? "-"
                         : "-"}
                     </td>
-                    <td className="py-2 font-medium">{stockQty(p)}</td>
-                    <td className="py-2 text-zinc-300">{p.minStock ?? 0}</td>
+                    <td className="py-2 text-zinc-300">{formatRemaining(p)}</td>
                     <td className="py-2">
                       <div className="flex justify-end gap-2">
                         <Link

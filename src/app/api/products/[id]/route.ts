@@ -5,15 +5,9 @@ import { Product } from "@/models/Product";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
-  genericName: z.string().optional(),
   brand: z.string().optional(),
-  unit: z.string().optional(),
   categoryId: z.string().optional(),
   defaultSupplierId: z.string().optional(),
-  purchasePriceDefault: z.coerce.number().min(0).optional(),
-  salePriceDefault: z.coerce.number().min(0).optional(),
-  minStock: z.coerce.number().min(0).optional(),
-  isActive: z.coerce.boolean().optional(),
 });
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
